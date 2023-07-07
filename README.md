@@ -9,5 +9,5 @@ Simple third person controllable human that you can use to run around in your le
 3. Drag and drop the player scene (Human-For-Scale.tscn) into the scene you want to walk around in.
 4. Make sure your scene has colliders for the floor at least, or the player will just fall through the map.
 5. Run your scene.
-6. WASD to move, SHIFT to sprint, SPACE to jump, V to noclip, ESCAPE to capture/uncapture mouse
+6. WASD to move, SHIFT to sprint, SPACE to jump, V to noclip, ESCAPE to capture/uncapture mouse.
 7. Mouse is uncaptured on start.

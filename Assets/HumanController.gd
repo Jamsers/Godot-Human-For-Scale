@@ -11,6 +11,8 @@ const NOCLIP_MULT = 4
 const ROTATE_SPEED = 12.0
 const JUMP_FORCE = 15.0
 const GRAVITY_FORCE = 50.0
+const COLLIDE_FORCE = 0.05
+const DIRECTIONAL_FORCE_DIV = 30.0
 const TOGGLE_COOLDOWN = 0.5
 
 var move_direction = Vector3.ZERO
@@ -21,6 +23,8 @@ var noclip_on = false
 var noclip_toggle_cooldown = 0.0
 var mousecapture_on = false
 var mousecapture_toggle_cooldown = 0.0
+var rigidbody_collisions = []
+var input_velocity = Vector3.ZERO
 var anim_player
 
 var mouse_movement = Vector2.ZERO
@@ -59,7 +63,26 @@ func _process(delta):
 		if jump_isdown and is_on_floor():
 			velocity.y = JUMP_FORCE
 	
+	input_velocity = velocity
+	
 	move_and_slide()
+	
+	rigidbody_collisions = []
+	
+	for index in get_slide_collision_count():
+		var collision = get_slide_collision(index)
+		if collision.get_collider() is RigidBody3D:
+			rigidbody_collisions.append(collision)
+
+func _physics_process(delta):
+	var central_multiplier = input_velocity.length() * COLLIDE_FORCE
+	var directional_multiplier = input_velocity.length() * (COLLIDE_FORCE/DIRECTIONAL_FORCE_DIV)
+	
+	for collision in rigidbody_collisions:
+		var direction = -collision.get_normal()
+		var location = collision.get_position()
+		collision.get_collider().apply_central_impulse(direction * central_multiplier)
+		collision.get_collider().apply_impulse(direction * directional_multiplier, location)
 
 func process_mousecapture(delta):
 	if mousecapture_isdown and mousecapture_toggle_cooldown == 0:

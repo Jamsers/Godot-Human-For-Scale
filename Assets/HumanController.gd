@@ -8,7 +8,7 @@ const ANIM_RUN_SPEED = 5.5
 const MOVE_MULT = 1.4
 const RUN_MULT = 1.25
 const NOCLIP_MULT = 4
-const ROTATE_SPEED = 15.0
+const ROTATE_SPEED = 12.0
 const JUMP_FORCE = 15.0
 const GRAVITY_FORCE = 50.0
 const TOGGLE_COOLDOWN = 0.5
@@ -116,7 +116,7 @@ func process_animation(delta):
 		anim_player.play("Idle")
 	
 	if move_direction != Vector3.ZERO:
-		$ModelRoot.basis = $ModelRoot.basis.slerp(Basis.looking_at(move_direction_no_y), ROTATE_SPEED * delta)
+		$ModelRoot.basis = basis_rotate_toward($ModelRoot.basis, Basis.looking_at(move_direction_no_y), ROTATE_SPEED * delta)
 
 func process_noclip(delta):
 	if noclip_isdown and noclip_toggle_cooldown == 0:
@@ -149,3 +149,9 @@ func _unhandled_input(event):
 				jump_isdown = event.pressed
 			KEY_ESCAPE:
 				mousecapture_isdown = event.pressed
+
+static func rotate_toward(from: Quaternion, to: Quaternion, delta: float) -> Quaternion:
+	return from.slerp(to, clamp(delta / from.angle_to(to), 0.0, 1.0)).normalized()
+
+static func basis_rotate_toward(from: Basis, to: Basis, delta: float) -> Basis:
+	return Basis(rotate_toward(from.get_rotation_quaternion(), to.get_rotation_quaternion(), delta)).orthonormalized()

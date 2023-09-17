@@ -20,6 +20,6 @@ normal_texture = ExtResource("4_0holo")
 ao_texture = SubResource("CompressedTexture2D_i86yv")
 ao_texture_channel = 4
 subsurf_scatter_enabled = true
-subsurf_scatter_strength = 0.5
+subsurf_scatter_strength = 0.6
 subsurf_scatter_skin_mode = true
 texture_filter = 5

@@ -30,6 +30,7 @@ var mousecapture_isdown = false
 
 func _ready():
 	basis = Basis.IDENTITY
+	$"ModelRoot/mannequiny-0_3_0/AnimationPlayer".playback_default_blend_time = 0.5
 
 func _process(delta):
 	process_mousecapture(delta)
@@ -99,18 +100,18 @@ func process_movement():
 
 func process_animation(delta):
 	if !is_on_floor():
-		$ModelRoot/Human/AnimationPlayer.play("Fall")
+		$"ModelRoot/mannequiny-0_3_0/AnimationPlayer".play("Fall")
 	elif move_direction != Vector3.ZERO:
-		$ModelRoot/Human/AnimationPlayer.play("Run")
+		$"ModelRoot/mannequiny-0_3_0/AnimationPlayer".play("Jog")
 	else:
-		$ModelRoot/Human/AnimationPlayer.play("Idle")
+		$"ModelRoot/mannequiny-0_3_0/AnimationPlayer".play("Idle")
 		
 	if move_direction != Vector3.ZERO:
 		$ModelRoot.basis = $ModelRoot.basis.slerp(Basis.looking_at(move_direction_no_y), ROTATE_SPEED * delta)
 		if sprint_isdown and is_on_floor():
-			$ModelRoot/Human/AnimationPlayer.speed_scale = 2
+			$"ModelRoot/mannequiny-0_3_0/AnimationPlayer".speed_scale = 2
 		else:
-			$ModelRoot/Human/AnimationPlayer.speed_scale = 1
+			$"ModelRoot/mannequiny-0_3_0/AnimationPlayer".speed_scale = 1
 
 func process_noclip(delta):
 	if noclip_isdown and noclip_toggle_cooldown == 0:

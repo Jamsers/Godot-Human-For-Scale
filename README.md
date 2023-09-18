@@ -1,9 +1,7 @@
 # Godot-Human-For-Scale
-![Screenshot](Screenshot.jpg)
+Simple third person controllable character that you can use to run around in your level to get a sense of scale. No input bindings or camera set up necessary, just drag and drop into your scene. The character is 5'10. (177.8 cm)
 
-Simple third person controllable human that you can use to run around in your level to get a sense of scale. No input bindings or camera set up necessary, just drag and drop into your scene. The human is a 5'10 (177.8 cm) male.
-
-
+https://github.com/Jamsers/Godot-Human-For-Scale/assets/39361911/ea40c6ec-47b0-43da-a2c2-1e5539d293f6
 
 ## How to use
 1. Clone or download the Github repository.
@@ -22,3 +20,7 @@ V to noclip
 ESCAPE to capture/uncapture mouse.
 
 **Mouse is uncaptured on start!**
+
+## Credits
+
+Uses the fantastic [mannequiny](https://github.com/GDQuest/godot-3d-mannequin/tree/master/godot/assets/3d/mannequiny) from GDQuest's [godot-3d-mannequin](https://github.com/GDQuest/godot-3d-mannequin)!

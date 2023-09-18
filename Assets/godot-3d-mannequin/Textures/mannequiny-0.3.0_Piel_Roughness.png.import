@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b42y1c50w66rx"
-path.s3tc="res://.godot/imported/BaseColor.png-8a2a88c921679680880c082f66072540.s3tc.ctex"
+uid="uid://druyne6ut1iry"
+path.s3tc="res://.godot/imported/mannequiny-0.3.0_Piel_Roughness.png-904763dd4fc5097ee1b46a9011ce4843.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://Godot-Human-For-Scale/Assets/Textures/BaseColor.png"
-dest_files=["res://.godot/imported/BaseColor.png-8a2a88c921679680880c082f66072540.s3tc.ctex"]
+source_file="res://Godot-Human-For-Scale/Assets/godot-3d-mannequin/Textures/mannequiny-0.3.0_Piel_Roughness.png"
+dest_files=["res://.godot/imported/mannequiny-0.3.0_Piel_Roughness.png-904763dd4fc5097ee1b46a9011ce4843.s3tc.ctex"]
 
 [params]
 

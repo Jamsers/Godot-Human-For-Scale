@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://26dx6khot3i6"
-path.s3tc="res://.godot/imported/Roughness.png-8120b62e484155881961f973d3d066e9.s3tc.ctex"
+uid="uid://djpepasluiivs"
+path.s3tc="res://.godot/imported/mannequiny-0.3.0_Todo_Metallic.png-2824097c1fba562587b0962ee0989cd6.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://Godot-Human-For-Scale/Assets/Textures/Roughness.png"
-dest_files=["res://.godot/imported/Roughness.png-8120b62e484155881961f973d3d066e9.s3tc.ctex"]
+source_file="res://Godot-Human-For-Scale/Assets/godot-3d-mannequin/Textures/mannequiny-0.3.0_Todo_Metallic.png"
+dest_files=["res://.godot/imported/mannequiny-0.3.0_Todo_Metallic.png-2824097c1fba562587b0962ee0989cd6.s3tc.ctex"]
 
 [params]
 

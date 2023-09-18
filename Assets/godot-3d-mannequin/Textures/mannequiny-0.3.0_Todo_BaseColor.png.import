@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cqc8n47x58ixs"
-path.s3tc="res://.godot/imported/Metallic.png-a0c17b7fefc6e1abac89f4c89100e559.s3tc.ctex"
+uid="uid://5uvv7r3nbwba"
+path.s3tc="res://.godot/imported/mannequiny-0.3.0_Todo_BaseColor.png-87ac9a6b4222d6a5dacd58c9fba6be32.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://Godot-Human-For-Scale/Assets/Textures/Metallic.png"
-dest_files=["res://.godot/imported/Metallic.png-a0c17b7fefc6e1abac89f4c89100e559.s3tc.ctex"]
+source_file="res://Godot-Human-For-Scale/Assets/godot-3d-mannequin/Textures/mannequiny-0.3.0_Todo_BaseColor.png"
+dest_files=["res://.godot/imported/mannequiny-0.3.0_Todo_BaseColor.png-87ac9a6b4222d6a5dacd58c9fba6be32.s3tc.ctex"]
 
 [params]
 

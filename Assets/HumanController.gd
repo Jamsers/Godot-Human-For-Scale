@@ -3,10 +3,16 @@ extends CharacterBody3D
 const LOOK_SENSITIVITY = 0.0025
 const LOOK_LIMIT_UPPER = 1.15
 const LOOK_LIMIT_LOWER = -1.15
-const MOVE_SPEED = 4.5
-const ROTATE_SPEED = 15.0
+const ANIM_MOVE_SPEED = 3
+const ANIM_RUN_SPEED = 5.5
+const MOVE_MULT = 1.4
+const RUN_MULT = 1.25
+const NOCLIP_MULT = 4
+const ROTATE_SPEED = 12.0
 const JUMP_FORCE = 15.0
 const GRAVITY_FORCE = 50.0
+const COLLIDE_FORCE = 0.05
+const DIRECTIONAL_FORCE_DIV = 30.0
 const TOGGLE_COOLDOWN = 0.5
 
 var move_direction = Vector3.ZERO
@@ -17,6 +23,9 @@ var noclip_on = false
 var noclip_toggle_cooldown = 0.0
 var mousecapture_on = false
 var mousecapture_toggle_cooldown = 0.0
+var rigidbody_collisions = []
+var input_velocity = Vector3.ZERO
+var anim_player
 
 var mouse_movement = Vector2.ZERO
 var forward_isdown = false
@@ -30,6 +39,8 @@ var mousecapture_isdown = false
 
 func _ready():
 	basis = Basis.IDENTITY
+	anim_player = $"ModelRoot/mannequiny-0_3_0/AnimationPlayer"
+	anim_player.playback_default_blend_time = 0.75
 
 func _process(delta):
 	process_mousecapture(delta)
@@ -38,12 +49,12 @@ func _process(delta):
 	process_animation(delta)
 	process_noclip(delta)
 	
-	var move_speed = MOVE_SPEED
+	var move_speed = ANIM_MOVE_SPEED * MOVE_MULT
 	if sprint_isdown:
-		move_speed = MOVE_SPEED * 2
+		move_speed = ANIM_RUN_SPEED * RUN_MULT
 	
 	if noclip_on:
-		velocity = move_direction * (move_speed * 3)
+		velocity = move_direction * (move_speed * NOCLIP_MULT)
 	else:
 		velocity.x = move_direction_no_y.x * move_speed 
 		velocity.z = move_direction_no_y.z * move_speed
@@ -52,7 +63,26 @@ func _process(delta):
 		if jump_isdown and is_on_floor():
 			velocity.y = JUMP_FORCE
 	
+	input_velocity = velocity
+	
 	move_and_slide()
+	
+	rigidbody_collisions = []
+	
+	for index in get_slide_collision_count():
+		var collision = get_slide_collision(index)
+		if collision.get_collider() is RigidBody3D:
+			rigidbody_collisions.append(collision)
+
+func _physics_process(delta):
+	var central_multiplier = input_velocity.length() * COLLIDE_FORCE
+	var directional_multiplier = input_velocity.length() * (COLLIDE_FORCE/DIRECTIONAL_FORCE_DIV)
+	
+	for collision in rigidbody_collisions:
+		var direction = -collision.get_normal()
+		var location = collision.get_position()
+		collision.get_collider().apply_central_impulse(direction * central_multiplier)
+		collision.get_collider().apply_impulse(direction * directional_multiplier, location)
 
 func process_mousecapture(delta):
 	if mousecapture_isdown and mousecapture_toggle_cooldown == 0:
@@ -99,18 +129,17 @@ func process_movement():
 
 func process_animation(delta):
 	if !is_on_floor():
-		$ModelRoot/Human/AnimationPlayer.play("Fall")
+		anim_player.play("Fall")
 	elif move_direction != Vector3.ZERO:
-		$ModelRoot/Human/AnimationPlayer.play("Run")
-	else:
-		$ModelRoot/Human/AnimationPlayer.play("Idle")
-		
-	if move_direction != Vector3.ZERO:
-		$ModelRoot.basis = $ModelRoot.basis.slerp(Basis.looking_at(move_direction_no_y), ROTATE_SPEED * delta)
-		if sprint_isdown and is_on_floor():
-			$ModelRoot/Human/AnimationPlayer.speed_scale = 2
+		if sprint_isdown:
+			anim_player.play("Run", -1, RUN_MULT)
 		else:
-			$ModelRoot/Human/AnimationPlayer.speed_scale = 1
+			anim_player.play("Jog", -1, MOVE_MULT)
+	else:
+		anim_player.play("Idle")
+	
+	if move_direction != Vector3.ZERO:
+		$ModelRoot.basis = basis_rotate_toward($ModelRoot.basis, Basis.looking_at(move_direction_no_y), ROTATE_SPEED * delta)
 
 func process_noclip(delta):
 	if noclip_isdown and noclip_toggle_cooldown == 0:
@@ -143,3 +172,9 @@ func _unhandled_input(event):
 				jump_isdown = event.pressed
 			KEY_ESCAPE:
 				mousecapture_isdown = event.pressed
+
+static func rotate_toward(from: Quaternion, to: Quaternion, delta: float) -> Quaternion:
+	return from.slerp(to, clamp(delta / from.angle_to(to), 0.0, 1.0)).normalized()
+
+static func basis_rotate_toward(from: Basis, to: Basis, delta: float) -> Basis:
+	return Basis(rotate_toward(from.get_rotation_quaternion(), to.get_rotation_quaternion(), delta)).orthonormalized()

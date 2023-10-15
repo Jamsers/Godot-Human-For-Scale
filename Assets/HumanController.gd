@@ -1,18 +1,28 @@
 extends CharacterBody3D
 
-const FP_CAMERA_HEIGHT = 1.655
-const FP_FOV = 75.0
-const TP_CAMERA_HEIGHT = 1.544
-const TP_FOV = 60.0
-const TP_CAMERA_OFFSET = 0.5
-const TP_CAMERA_DISTANCE = 2.1
+@export var enable_depth_of_field: bool = false
+@export var disable_shadow_in_first_person: bool = false
+
+# --- Stuff you might be interested in tweaking ---
 const LOOK_SENSITIVITY = 0.0025
-const LOOK_LIMIT_UPPER = 1.15
-const LOOK_LIMIT_LOWER = -1.15
-const ANIM_MOVE_SPEED = 3
-const ANIM_RUN_SPEED = 5.5
 const MOVE_MULT = 1.4
 const RUN_MULT = 1.25
+const FP_FOV = 75.0
+const TP_FOV = 60.0
+const ZOOM_MULT = 0.35
+const DOF_AREA_SOFTNESS = 1.15
+const DOF_AREA_SIZE_MULTIPLIER = 0.0
+# --- Stuff you might be interested in tweaking ---
+
+const FP_CAMERA_HEIGHT = 1.655
+const TP_CAMERA_HEIGHT = 1.544
+const TP_CAMERA_OFFSET = 0.5
+const TP_CAMERA_DISTANCE = 2.1
+const TRANSITION_SPEED = 0.25
+const LOOK_LIMIT_UPPER = 1.25
+const LOOK_LIMIT_LOWER = -1.25
+const ANIM_MOVE_SPEED = 3
+const ANIM_RUN_SPEED = 5.5
 const NOCLIP_MULT = 4
 const ROTATE_SPEED = 12.0
 const JUMP_FORCE = 15.0
@@ -20,6 +30,8 @@ const GRAVITY_FORCE = 50.0
 const COLLIDE_FORCE = 0.05
 const DIRECTIONAL_FORCE_DIV = 30.0
 const TOGGLE_COOLDOWN = 0.5
+const DOF_MOVE_SPEED = 40
+const DOF_INTENSITY = 0.25
 
 var move_direction = Vector3.ZERO
 var move_direction_no_y = Vector3.ZERO
@@ -29,10 +41,15 @@ var noclip_on = false
 var noclip_toggle_cooldown = 0.0
 var cam_is_fp = false
 var cam_toggle_cooldown = 0.0
-var mousecapture_on = true
+var cam_is_zoomed = false
+var cam_zoom_cooldown = 0.0
+var shoulder_is_swapped = false
+var shoulder_cooldown = 0.0
+var mousecapture_on = false
 var mousecapture_toggle_cooldown = 0.0
 var rigidbody_collisions = []
 var input_velocity = Vector3.ZERO
+var is_cam_transitioning = false
 
 var mouse_movement = Vector2.ZERO
 var forward_isdown = false
@@ -44,16 +61,54 @@ var noclip_isdown = false
 var sprint_isdown = false
 var jump_isdown = false
 var mousecapture_isdown = false
+var zoom_isdown = false
+var shoulder_isdown = false
 
 @onready var camera_pivot = $"CameraPivot"
 @onready var spring_arm = $"CameraPivot/SpringArm"
 @onready var camera = $"CameraPivot/SpringArm/Camera"
+@onready var focus_ray = $"CameraPivot/SpringArm/Camera/RayCast3D"
 @onready var player_mesh = $"ModelRoot/mannequiny-0_3_0/root/Skeleton3D/mannequiny"
 @onready var anim_player = $"ModelRoot/mannequiny-0_3_0/AnimationPlayer"
 
 func _ready():
 	basis = Basis.IDENTITY
 	anim_player.playback_default_blend_time = 0.2
+	if enable_depth_of_field:
+		hijack_camera_attributes()
+
+func hijack_camera_attributes():
+	var cams_or_envs = []
+	cams_or_envs += get_tree().current_scene.find_children("*", "WorldEnvironment", true)
+	cams_or_envs += get_tree().current_scene.find_children("*", "Camera3D", true)
+	var hijacked_attributes = null
+	
+	for node in cams_or_envs:
+		if node is WorldEnvironment:
+			if node.camera_attributes != null:
+				hijacked_attributes = node.camera_attributes
+				break
+		if node is Camera3D:
+			if node.attributes != null:
+				hijacked_attributes = node.attributes
+				break
+	
+	camera.attributes = create_practical_attributes(hijacked_attributes)
+
+func create_practical_attributes(attributes):
+	var practical_attributes = CameraAttributesPractical.new()
+	
+	if attributes != null:
+		if attributes is CameraAttributesPractical:
+			practical_attributes = attributes.duplicate()
+		else:
+			practical_attributes.auto_exposure_enabled = attributes.auto_exposure_enabled
+			practical_attributes.auto_exposure_scale = attributes.auto_exposure_scale
+			practical_attributes.auto_exposure_speed = attributes.auto_exposure_speed
+			practical_attributes.exposure_multiplier = attributes.exposure_multiplier
+			practical_attributes.exposure_sensitivity = attributes.exposure_sensitivity
+	
+	return practical_attributes
 
 func _process(delta):
 	process_mousecapture(delta)
@@ -62,6 +117,9 @@ func _process(delta):
 	process_animation(delta)
 	process_noclip(delta)
 	process_cam_toggle(delta)
+	process_cam_zoom(delta)
+	process_shoulder_swap(delta)
+	process_dof(delta)
 	
 	var move_speed = ANIM_MOVE_SPEED * MOVE_MULT
 	if sprint_isdown:
@@ -165,29 +223,143 @@ func process_noclip(delta):
 	noclip_toggle_cooldown = clamp(noclip_toggle_cooldown, 0, TOGGLE_COOLDOWN)
 
 func process_cam_toggle(delta):
-	if cam_toggle_isdown and cam_toggle_cooldown == 0:
+	if cam_toggle_isdown and cam_toggle_cooldown == 0 and !is_cam_transitioning:
 		cam_is_fp = !cam_is_fp
 		cam_toggle_cooldown = TOGGLE_COOLDOWN
-		
-		if cam_is_fp:
-			camera_pivot.position.y = FP_CAMERA_HEIGHT
-			spring_arm.position.x = 0.0
-			spring_arm.spring_length = 0.0
-			camera.fov = FP_FOV
-			player_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
-		else:
-			camera_pivot.position.y = TP_CAMERA_HEIGHT
-			spring_arm.position.x = TP_CAMERA_OFFSET
-			spring_arm.spring_length = TP_CAMERA_DISTANCE
-			camera.fov = TP_FOV
-			player_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		cam_transition()
 	
 	cam_toggle_cooldown -= delta
 	cam_toggle_cooldown = clamp(cam_toggle_cooldown, 0, TOGGLE_COOLDOWN)
 
+func process_cam_zoom(delta):
+	if zoom_isdown and cam_zoom_cooldown == 0 and !is_cam_transitioning:
+		cam_is_zoomed = !cam_is_zoomed
+		cam_zoom_cooldown = TOGGLE_COOLDOWN
+		cam_transition()
+	
+	cam_zoom_cooldown -= delta
+	cam_zoom_cooldown = clamp(cam_zoom_cooldown, 0, TOGGLE_COOLDOWN)
+
+func process_shoulder_swap(delta):
+	if shoulder_isdown and shoulder_cooldown == 0 and !is_cam_transitioning and !cam_is_fp:
+		shoulder_is_swapped = !shoulder_is_swapped
+		shoulder_cooldown = TOGGLE_COOLDOWN
+		cam_transition()
+	
+	shoulder_cooldown -= delta
+	shoulder_cooldown = clamp(shoulder_cooldown, 0, TOGGLE_COOLDOWN)
+
+func cam_transition():
+	if is_cam_transitioning:
+		return
+	
+	var fov
+	var offset
+	
+	if cam_is_zoomed:
+		if cam_is_fp:
+			fov = FP_FOV * ZOOM_MULT
+		else:
+			fov = TP_FOV * ZOOM_MULT
+	else:
+		if cam_is_fp:
+			fov = FP_FOV
+		else:
+			fov = TP_FOV
+	
+	if shoulder_is_swapped:
+		offset = -TP_CAMERA_OFFSET
+	else:
+		offset = TP_CAMERA_OFFSET
+	
+	if cam_is_fp:
+		cam_transitioning(FP_CAMERA_HEIGHT, 0.0, 0.0, fov, false)
+	else:
+		cam_transitioning(TP_CAMERA_HEIGHT, offset, TP_CAMERA_DISTANCE, fov, true)
+
+func cam_transitioning(height, offset, length, fov, mesh_visible):
+	is_cam_transitioning = true
+	
+	var time = Time.get_ticks_msec()
+	var orig_height = camera_pivot.position.y
+	var orig_offset = spring_arm.position.x
+	var orig_length = spring_arm.spring_length
+	var orig_fov = camera.fov
+	
+	if mesh_visible:
+		if disable_shadow_in_first_person:
+			player_mesh.visible = true
+		else:
+			player_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	
+	while is_cam_transitioning:
+		var current_time = Time.get_ticks_msec()
+		var lerp = (current_time - time)/(TRANSITION_SPEED * 1000.0)
+		
+		if lerp > 1:
+			camera_pivot.position.y = height
+			spring_arm.position.x = offset
+			spring_arm.spring_length = length
+			camera.fov = fov
+			if !mesh_visible:
+				if disable_shadow_in_first_person:
+					player_mesh.visible = false
+				else:
+					player_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+			is_cam_transitioning = false
+			break
+		
+		camera_pivot.position.y = lerp(orig_height, height, ease_in_out_sine(lerp))
+		spring_arm.position.x = lerp(orig_offset, offset, ease_in_out_sine(lerp))
+		# Adjusting spring_length is jittery. Likely only updates on physics process.
+		spring_arm.spring_length = lerp(orig_length, length, lerp)
+		# So if you're noticing jitter when switching cams, ^ this lerp is responsible.
+		camera.fov = lerp(orig_fov, fov, ease_in_out_sine(lerp))
+		
+		await get_tree().process_frame
+
+func process_dof(delta):
+	if !enable_depth_of_field:
+		return
+	
+	var near_distance = 0.5
+	var near_transition = 0.25
+	var far_distance = 50
+	var far_transition = 50
+	var blur_amount = 0.1
+	
+	if !cam_is_zoomed:
+		camera.attributes.dof_blur_near_enabled = true
+		near_distance = 0.5
+		near_transition = 0.25
+		camera.attributes.dof_blur_far_enabled = false
+		far_distance = 50
+		far_transition = 50
+		blur_amount = 0.1
+	else:
+		var hit_distance = camera.global_position.distance_to(focus_ray.get_collision_point())
+		camera.attributes.dof_blur_near_enabled = true
+		near_distance = hit_distance - (hit_distance * DOF_AREA_SIZE_MULTIPLIER)
+		near_transition = hit_distance * DOF_AREA_SOFTNESS
+		camera.attributes.dof_blur_far_enabled = true
+		far_distance =  hit_distance + (hit_distance * DOF_AREA_SIZE_MULTIPLIER)
+		far_transition = hit_distance * DOF_AREA_SOFTNESS
+		blur_amount = DOF_INTENSITY
+	
+	camera.attributes.dof_blur_near_distance = move_toward(camera.attributes.dof_blur_near_distance, near_distance, delta * DOF_MOVE_SPEED) 
+	camera.attributes.dof_blur_near_transition = move_toward(camera.attributes.dof_blur_near_transition, near_transition, delta * DOF_MOVE_SPEED) 
+	camera.attributes.dof_blur_far_distance =  move_toward(camera.attributes.dof_blur_far_distance, far_distance, delta * DOF_MOVE_SPEED)
+	camera.attributes.dof_blur_far_transition = move_toward(camera.attributes.dof_blur_far_transition, far_transition, delta * DOF_MOVE_SPEED)
+	camera.attributes.dof_blur_amount = move_toward(camera.attributes.dof_blur_amount, blur_amount, delta * (DOF_MOVE_SPEED/10))
+
 func _unhandled_input(event):
 	if event is InputEventMouseMotion:
 		mouse_movement -= event.relative
+	
+	if event is InputEventMouseButton:
+		match event.button_index:
+			MOUSE_BUTTON_RIGHT:
+				zoom_isdown = event.pressed
 	
 	if event is InputEventKey:
 		match event.keycode:
@@ -209,6 +381,8 @@ func _unhandled_input(event):
 				jump_isdown = event.pressed
 			KEY_ESCAPE:
 				mousecapture_isdown = event.pressed
+			KEY_TAB:
+				shoulder_isdown = event.pressed
 
 func switch_anim(anim, speed = 1):
 	if anim_player.current_animation != anim:
@@ -219,3 +393,6 @@ static func quat_rotate_toward(from: Quaternion, to: Quaternion, delta: float) -
 
 static func basis_rotate_toward(from: Basis, to: Basis, delta: float) -> Basis:
 	return Basis(quat_rotate_toward(from.get_rotation_quaternion(), to.get_rotation_quaternion(), delta)).orthonormalized()
+
+func ease_in_out_sine(lerp):
+	return -(cos(PI * lerp) - 1) / 2;

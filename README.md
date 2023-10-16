@@ -25,6 +25,10 @@ V to switch third person/first person
 RIGHT CLICK to zoom/focus  
 TAB to switch third person camera shoulders  
 
+## Extra Options
+
+You can enable depth of field for the zoom functionality. No camera attributes setup necessary.  
+You can disable the character's shadow in first person view.
 
 ## Credits
 

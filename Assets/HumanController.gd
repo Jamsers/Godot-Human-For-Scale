@@ -24,12 +24,14 @@ const LOOK_LIMIT_LOWER = -1.25
 const ANIM_MOVE_SPEED = 3.0
 const ANIM_RUN_SPEED = 5.5
 const ANIM_BLEND_TIME = 0.2
+const OFF_FLOOR_JUMP_TIMEOUT = 0.1
 const NOCLIP_MULT = 4.0
 const ROTATE_SPEED = 12.0
 const JUMP_FORCE = 15.0
 const GRAVITY_FORCE = 50.0
-const COLLIDE_FORCE = 0.05
-const DIRECTIONAL_FORCE_DIV = 30.0
+# 285 seems to be enough to move a max of 200kg
+const COLLIDE_FORCE = 250.0
+const MAX_PUSHABLE_WEIGHT = 200.0
 const TOGGLE_COOLDOWN = 0.5
 const DOF_MOVE_SPEED = 40.0
 const DOF_INTENSITY = 0.25
@@ -38,6 +40,7 @@ var move_direction = Vector3.ZERO
 var move_direction_no_y = Vector3.ZERO
 var camera_rotation = Quaternion.IDENTITY
 var camera_rotation_no_y = Quaternion.IDENTITY
+var is_off_floor_duration = 0.0
 var noclip_on = false
 var noclip_toggle_cooldown = 0.0
 var cam_is_fp = false
@@ -91,6 +94,7 @@ func _ready():
 
 func _process(delta):
 	process_camera()
+	process_is_off_floor(delta)
 	process_movement()
 	process_animation(delta)
 	process_mousecapture(delta)
@@ -109,7 +113,7 @@ func _process(delta):
 	else:
 		velocity.x = move_direction_no_y.x * move_speed 
 		velocity.z = move_direction_no_y.z * move_speed
-		if not is_on_floor():
+		if !is_on_floor():
 			velocity.y -= GRAVITY_FORCE * delta
 		if jump_isdown and is_on_floor():
 			velocity.y = JUMP_FORCE
@@ -126,14 +130,21 @@ func _process(delta):
 			rigidbody_collisions.append(collision)
 
 func _physics_process(delta):
-	var central_multiplier = input_velocity.length() * COLLIDE_FORCE
-	var directional_multiplier = input_velocity.length() * (COLLIDE_FORCE/DIRECTIONAL_FORCE_DIV)
+	var collide_force = COLLIDE_FORCE * delta
+	var central_multiplier = input_velocity.length() * collide_force
 	
 	for collision in rigidbody_collisions:
+		var weight = collision.get_collider().mass
 		var direction = -collision.get_normal()
-		var location = collision.get_position()
-		collision.get_collider().apply_central_impulse(direction * central_multiplier)
-		collision.get_collider().apply_impulse(direction * directional_multiplier, location)
+		var mult_actual = lerp(0.0, central_multiplier, ease_out_circ(weight/MAX_PUSHABLE_WEIGHT))
+		collision.get_collider().apply_central_impulse(direction * mult_actual)
+
+func process_is_off_floor(delta):
+	if !is_on_floor():
+		is_off_floor_duration += delta
+	else:
+		is_off_floor_duration = 0.0
+	is_off_floor_duration = clamp(is_off_floor_duration, 0.0, OFF_FLOOR_JUMP_TIMEOUT)
 
 func process_camera():
 	var camera_rotation_euler = camera_rotation.get_euler()
@@ -166,7 +177,7 @@ func process_movement():
 	move_direction_no_y = move_direction_no_y.normalized()
 
 func process_animation(delta):
-	if !is_on_floor():
+	if is_off_floor_duration >= OFF_FLOOR_JUMP_TIMEOUT:
 		switch_anim("Fall")
 	elif move_direction != Vector3.ZERO:
 		if sprint_isdown:
@@ -347,15 +358,16 @@ func hijack_camera_attributes():
 				hijacked_attributes = node.camera_attributes
 				break
 	
-	camera.attributes = create_practical_attributes(hijacked_attributes)
+	camera.attributes = assert_practical_attributes(hijacked_attributes)
 
-func create_practical_attributes(attributes):
+func assert_practical_attributes(attributes):
 	var practical_attributes = CameraAttributesPractical.new()
 	
 	if attributes != null:
 		if attributes is CameraAttributesPractical:
-			practical_attributes = attributes.duplicate()
+			practical_attributes = attributes
 		else:
+			push_warning("CameraAttributesPhysical not supported. Making a CameraAttributesPractical duplicate for Godot-Human-For-Scale's camera.")
 			practical_attributes.auto_exposure_enabled = attributes.auto_exposure_enabled
 			practical_attributes.auto_exposure_scale = attributes.auto_exposure_scale
 			practical_attributes.auto_exposure_speed = attributes.auto_exposure_speed
@@ -385,7 +397,7 @@ func _unhandled_input(event):
 				right_isdown = event.pressed
 			KEY_V:
 				cam_toggle_isdown = event.pressed
-			KEY_F:
+			KEY_QUOTELEFT:
 				noclip_isdown = event.pressed
 			KEY_SHIFT:
 				sprint_isdown = event.pressed
@@ -407,4 +419,7 @@ func basis_rotate_toward(from: Basis, to: Basis, delta: float) -> Basis:
 	return Basis(quat_rotate_toward(from.get_rotation_quaternion(), to.get_rotation_quaternion(), delta)).orthonormalized()
 
 func ease_in_out_sine(lerp: float) -> float:
-	return -(cos(PI * lerp) - 1.0) / 2.0;
+	return -(cos(PI * lerp) - 1.0) / 2.0
+
+func ease_out_circ(lerp: float) -> float:
+	return sqrt(1.0 - pow(lerp - 1.0, 2.0))

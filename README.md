@@ -26,6 +26,11 @@ V to switch third person/first person
 RIGHT CLICK to zoom/focus  
 TAB to switch third person camera shoulders  
 
+## Controls not working?
+
+*Mouse look not working?* A Control node is likely capturing mouse input. Find that Control node, set its Mouse Filter to Pass/Ignore.  
+*Keyboard controls not working?* A Control node is likely capturing keyboard input, most likely a button or text box. Find that Control node, set its Focus Mode to None.
+
 ## Extra Options
 
 You can enable depth of field for the zoom functionality. No camera attributes setup necessary.  

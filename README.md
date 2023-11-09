@@ -13,29 +13,34 @@ https://github.com/Jamsers/Godot-Human-For-Scale/assets/39361911/ea40c6ec-47b0-4
 **Make sure your scene has colliders for the floor at least, or the player will just fall through the map!**
 
 ## Controls
-ESCAPE to capture/uncapture mouse  
+- **ESCAPE** to capture/uncapture mouse  
+  ***Mouse is uncaptured on start!***  
 
-**Mouse is uncaptured on start!**  
+- **W-A-S-D** to move  
+  **SHIFT** to sprint  
+  **SPACE** to jump  
+  **TILDE(~)** to noclip
 
-WASD to move  
-SHIFT to sprint  
-SPACE to jump  
-TILDE(~) to noclip  
+- **V** to switch third person/first person  
+  **RIGHT CLICK** to zoom/focus  
+  **TAB** to switch third person camera shoulders  
 
-V to switch third person/first person  
-RIGHT CLICK to zoom/focus  
-TAB to switch third person camera shoulders  
+- **LEFT CLICK** to shoot physics gun  
 
 ## Controls not working?
 
-*Mouse look not working?* A Control node is likely capturing mouse input. Find that Control node, set its Mouse Filter to Pass/Ignore.  
-*Keyboard controls not working?* A Control node is likely capturing keyboard input, most likely a button or text box. Find that Control node, set its Focus Mode to None.
+*Mouse look not working?*  
+A Control node is likely capturing mouse input. Find that Control node, set its Mouse Filter to Pass/Ignore.  
+
+*Keyboard controls not working?*  
+A Control node is likely capturing keyboard input, most likely a button or text box. Find that Control node, set its Focus Mode to None.
 
 ## Extra Options
 
 You can enable depth of field for the zoom functionality. No camera attributes setup necessary.  
 You can disable the character's shadow in first person view.  
-You can enable audio, which will enable the audio listener, footstep sounds, and physics interactions sounds.
+You can enable audio, which will enable the audio listener, footstep sounds, and physics interactions sounds.  
+You can enable the physics gun, which throws a physics object of your choosing in front of you.
 
 ![human-for-scale-options](https://github.com/Jamsers/Godot-Human-For-Scale/assets/39361911/80a466c6-9890-41cf-8303-5225a2106b78)
 

@@ -35,6 +35,7 @@ const ANIM_RUN_SPEED = 5.5
 const JUMP_LAND_TIMEOUT = 0.1
 const NOCLIP_MULT = 4.0
 const ROTATE_SPEED = 12.0
+const STEP_HEIGHT = 0.25
 const JUMP_FORCE = 15.0
 const GRAVITY_FORCE = 50.0
 # 285 seems to be enough to move a max of 200kg
@@ -69,6 +70,7 @@ var mousecapture_toggle_cooldown = 0.0
 var physics_gun_cooldown = 0.0
 var is_cam_transitioning = false
 var input_velocity = Vector3.ZERO
+var orig_transform = Transform3D.IDENTITY
 var rigidbody_collisions = []
 var colliders_in_contact = []
 var collider_bump_cooldowns = []
@@ -174,6 +176,7 @@ func _process(delta):
 		has_landed_from_fall = false
 	
 	input_velocity = velocity
+	orig_transform = transform
 	
 	move_and_slide()
 	
@@ -185,6 +188,35 @@ func _process(delta):
 		var collision = get_slide_collision(index)
 		if collision.get_collider() is RigidBody3D:
 			rigidbody_collisions.append(collision)
+	
+	# Teleport based stairstepping
+	if is_on_floor() and !noclip_on:
+		if ((input_velocity.x != 0 or input_velocity.z != 0) and is_on_wall()):
+			var collision = KinematicCollision3D.new()
+			var begin_transform = orig_transform
+			var test_direction = Vector3.UP * STEP_HEIGHT
+			# Test to above current position
+			var can_not_step = test_move(begin_transform, test_direction)
+			if !can_not_step:
+				begin_transform.origin = begin_transform.origin + test_direction
+				test_direction = Vector3(input_velocity.x, 0, input_velocity.z) * delta
+				# Then, test towards player's direction running into wall
+				can_not_step = test_move(begin_transform, test_direction)
+				if !can_not_step:
+					begin_transform.origin = begin_transform.origin + test_direction
+					test_direction = Vector3.DOWN * 2
+					# Then, test downwards
+					can_not_step = test_move(begin_transform, test_direction, collision)
+					if can_not_step:
+						# If we hit something, teleport towards hit location
+						begin_transform.origin = begin_transform.origin + collision.get_travel()
+					else:
+						# If we hit nothing, just teleport to step location
+						begin_transform.origin = begin_transform.origin + test_direction
+					# Without the buffer the player can fail to make steps, especially at higher framerates
+					var step_landing_buffer = floor_snap_length - (safe_margin * 1.5)
+					begin_transform.origin = begin_transform.origin + (Vector3.UP * step_landing_buffer)
+					transform = begin_transform
 
 func _physics_process(delta):
 	var collide_force = COLLIDE_FORCE * delta

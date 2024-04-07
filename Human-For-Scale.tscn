@@ -36,7 +36,6 @@ distance_fade_max_distance = 0.0
 radius = 0.25
 
 [node name="Human-For-Scale" type="CharacterBody3D"]
-safe_margin = 0.1
 script = ExtResource("1_jh7dy")
 
 [node name="ModelRoot" type="Node3D" parent="."]

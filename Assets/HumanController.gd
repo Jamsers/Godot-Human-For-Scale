@@ -182,22 +182,26 @@ func _process(delta):
 	
 	rigidbody_collisions = []
 	
-	# Teleport based stairstepping
-	# If at any point we determine a stairstep isn't needed, early out and process rigidbody interactions
-	# Otherwise, do the stairstep but skip rigidbody interactions - they don't play nice with stairstepping ☹️
-	if (input_velocity.x == 0 and input_velocity.z == 0) or noclip_on or !is_on_floor() or !is_on_wall():
+	var has_stairstepped = stairstepping(orig_transform, delta)
+	
+	# Rigidbody interactions don't play nice with stairstepping ☹️
+	if !has_stairstepped:
 		collate_rigidbody_interactions()
-		return
+	
+	#collate_rigidbody_interactions()
+
+func stairstepping(starting_transform, delta):
+	if (input_velocity.x == 0 and input_velocity.z == 0) or noclip_on or !is_on_floor() or !is_on_wall():
+		return false
 	
 	var collision_out = KinematicCollision3D.new()
-	var begin_transform = orig_transform
+	var begin_transform = starting_transform
 	var test_direction = Vector3.UP * STEP_HEIGHT
 	# Test to above current position
 	var can_not_step = test_move(begin_transform, test_direction)
 	
 	if can_not_step:
-		collate_rigidbody_interactions()
-		return
+		return false
 	
 	begin_transform.origin = begin_transform.origin + test_direction
 	test_direction = Vector3(input_velocity.x, 0, input_velocity.z) * delta
@@ -205,8 +209,7 @@ func _process(delta):
 	can_not_step = test_move(begin_transform, test_direction)
 	
 	if can_not_step:
-		collate_rigidbody_interactions()
-		return
+		return false
 	
 	begin_transform.origin = begin_transform.origin + test_direction
 	test_direction = Vector3.DOWN * STEP_HEIGHT
@@ -224,6 +227,7 @@ func _process(delta):
 	var step_landing_buffer = floor_snap_length - (safe_margin * 2)
 	begin_transform.origin = begin_transform.origin + (Vector3.UP * step_landing_buffer)
 	transform = begin_transform
+	return true
 
 func collate_rigidbody_interactions():
 	for index in get_slide_collision_count():
@@ -299,12 +303,12 @@ func play_jump_land_sound():
 		jump_land_audio.stream = footstep_sounds.pick_random()
 		jump_land_audio.play()
 
-func play_bump_audio(global_position, volume_scale):
+func play_bump_audio(global_audio_position, volume_scale):
 	if !enable_audio:
 		return
 	var spawned_bump_audio = bump_audio.instantiate()
 	get_tree().root.get_child(0).add_child(spawned_bump_audio)
-	spawned_bump_audio.global_position = global_position
+	spawned_bump_audio.global_position = global_audio_position
 	spawned_bump_audio.stream = bump_sounds.pick_random()
 	volume_scale = clamp(volume_scale, 0.0, 1.0)
 	spawned_bump_audio.volume_db = lerp(-80.0, BUMP_AUDIO_VOLUME_DB, ease_out_circ(volume_scale))

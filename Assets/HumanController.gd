@@ -39,7 +39,7 @@ const STEP_HEIGHT = 0.25
 const JUMP_FORCE = 15.0
 const GRAVITY_FORCE = 50.0
 # 285 seems to be enough to move a max of 200kg
-const COLLIDE_FORCE = 250.0
+const COLLIDE_FORCE = 200.0
 const MAX_PUSHABLE_WEIGHT = 200.0
 const TOGGLE_COOLDOWN = 0.5
 const DOF_MOVE_SPEED = 40.0
@@ -187,8 +187,6 @@ func _process(delta):
 	# Rigidbody interactions don't play nice with stairstepping ☹️
 	if !has_stairstepped:
 		collate_rigidbody_interactions()
-	
-	#collate_rigidbody_interactions()
 
 func stairstepping(starting_transform, delta):
 	if (input_velocity.x == 0 and input_velocity.z == 0) or noclip_on or !is_on_floor() or !is_on_wall():
@@ -224,7 +222,7 @@ func stairstepping(starting_transform, delta):
 		begin_transform.origin = begin_transform.origin + test_direction
 	
 	# Without the buffer the player can fail to make steps, especially at higher framerates
-	var step_landing_buffer = floor_snap_length - (safe_margin * 2)
+	var step_landing_buffer = floor_snap_length - safe_margin
 	begin_transform.origin = begin_transform.origin + (Vector3.UP * step_landing_buffer)
 	transform = begin_transform
 	return true

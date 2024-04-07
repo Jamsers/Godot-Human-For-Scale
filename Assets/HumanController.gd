@@ -182,41 +182,56 @@ func _process(delta):
 	
 	rigidbody_collisions = []
 	
+	# Teleport based stairstepping
+	# If at any point we determine a stairstep isn't needed, early out and process rigidbody interactions
+	# Otherwise, do the stairstep but skip rigidbody interactions - they don't play nice with stairstepping ☹️
+	if (input_velocity.x == 0 and input_velocity.z == 0) or noclip_on or !is_on_floor() or !is_on_wall():
+		collate_rigidbody_interactions()
+		return
+	
+	var collision_out = KinematicCollision3D.new()
+	var begin_transform = orig_transform
+	var test_direction = Vector3.UP * STEP_HEIGHT
+	# Test to above current position
+	var can_not_step = test_move(begin_transform, test_direction)
+	
+	if can_not_step:
+		collate_rigidbody_interactions()
+		return
+	
+	begin_transform.origin = begin_transform.origin + test_direction
+	test_direction = Vector3(input_velocity.x, 0, input_velocity.z) * delta
+	# Then, test towards player's direction running into wall
+	can_not_step = test_move(begin_transform, test_direction)
+	
+	if can_not_step:
+		collate_rigidbody_interactions()
+		return
+	
+	begin_transform.origin = begin_transform.origin + test_direction
+	test_direction = Vector3.DOWN * STEP_HEIGHT
+	# Then, test downwards
+	can_not_step = test_move(begin_transform, test_direction, collision_out)
+	
+	if can_not_step:
+		# If we hit something, teleport towards hit location
+		begin_transform.origin = begin_transform.origin + collision_out.get_travel()
+	else:
+		# If we hit nothing, teleport back to original height
+		begin_transform.origin = begin_transform.origin + test_direction
+	
+	# Without the buffer the player can fail to make steps, especially at higher framerates
+	var step_landing_buffer = floor_snap_length - (safe_margin * 2)
+	begin_transform.origin = begin_transform.origin + (Vector3.UP * step_landing_buffer)
+	transform = begin_transform
+
+func collate_rigidbody_interactions():
 	for index in get_slide_collision_count():
 		if get_slide_collision(index) == null:
 			continue
 		var collision = get_slide_collision(index)
 		if collision.get_collider() is RigidBody3D:
 			rigidbody_collisions.append(collision)
-	
-	# Teleport based stairstepping
-	if is_on_floor() and !noclip_on:
-		if ((input_velocity.x != 0 or input_velocity.z != 0) and is_on_wall()):
-			var collision = KinematicCollision3D.new()
-			var begin_transform = orig_transform
-			var test_direction = Vector3.UP * STEP_HEIGHT
-			# Test to above current position
-			var can_not_step = test_move(begin_transform, test_direction)
-			if !can_not_step:
-				begin_transform.origin = begin_transform.origin + test_direction
-				test_direction = Vector3(input_velocity.x, 0, input_velocity.z) * delta
-				# Then, test towards player's direction running into wall
-				can_not_step = test_move(begin_transform, test_direction)
-				if !can_not_step:
-					begin_transform.origin = begin_transform.origin + test_direction
-					test_direction = Vector3.DOWN * 2
-					# Then, test downwards
-					can_not_step = test_move(begin_transform, test_direction, collision)
-					if can_not_step:
-						# If we hit something, teleport towards hit location
-						begin_transform.origin = begin_transform.origin + collision.get_travel()
-					else:
-						# If we hit nothing, just teleport to step location
-						begin_transform.origin = begin_transform.origin + test_direction
-					# Without the buffer the player can fail to make steps, especially at higher framerates
-					var step_landing_buffer = floor_snap_length - (safe_margin * 1.5)
-					begin_transform.origin = begin_transform.origin + (Vector3.UP * step_landing_buffer)
-					transform = begin_transform
 
 func _physics_process(delta):
 	var collide_force = COLLIDE_FORCE * delta

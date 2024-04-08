@@ -1,16 +1,10 @@
 extends CharacterBody3D
 
 @export_category("Extra Options")
+@export var enable_physics_gun: bool = false
 @export var enable_depth_of_field: bool = false
 @export var disable_shadow_in_first_person: bool = false
 @export var enable_audio: bool = false
-
-@export_category("Physics Gun")
-@export var enable_physics_gun: bool = false
-@export var physics_gun_object: RigidBody3D = null
-@export var physics_gun_force: float = 12.5
-@export var physics_gun_initial_distance: float = 1.5
-
 
 # --- Stuff you might be interested in tweaking ---
 const LOOK_SENSITIVITY = 0.0025
@@ -21,6 +15,12 @@ const TP_FOV = 60.0
 const ZOOM_MULT = 0.35
 const DOF_AREA_SOFTNESS = 1.15
 const DOF_AREA_SIZE_MULTIPLIER = 0.0
+# WARNING: in Godot Jolt physics damping seems to have inconsistent behavior between different physics tick rates
+const PHYSICS_GUN_DAMPING = 30.0
+const PHYSICS_GUN_PULL_FORCE = 800.0
+const PHYSICS_GUN_SHOOT_FORCE = 13.0
+const PHYSICS_GUN_HOLD_DISTANCE = 2.5
+const PHYSICS_GUN_PULL_RANGE = 15.0
 # --- Stuff you might be interested in tweaking ---
 
 const FP_CAMERA_HEIGHT = 1.655
@@ -41,7 +41,9 @@ const GRAVITY_FORCE = 50.0
 # 285 seems to be enough to move a max of 200kg
 const COLLIDE_FORCE = 200.0
 const MAX_PUSHABLE_WEIGHT = 200.0
-const TOGGLE_COOLDOWN = 0.5
+const PHYSICS_GUN_PULL_MARGIN = 2.0
+const PHYSICS_GUN_PULL_WIDTH = 0.8
+const TOGGLE_COOLDOWN = 0.25
 const DOF_MOVE_SPEED = 40.0
 const DOF_INTENSITY = 0.25
 const BUMP_AUDIO_TIMEOUT = 0.15
@@ -74,6 +76,11 @@ var orig_transform = Transform3D.IDENTITY
 var rigidbody_collisions = []
 var colliders_in_contact = []
 var collider_bump_cooldowns = []
+var physics_gun_has_grabbed = false
+var physics_gun_object = null
+var physics_gun_object_linear_damp = 0.0
+var physics_gun_object_angular_damp = 0.0
+var physics_gun_hit_point = Vector3.ZERO
 
 var mouse_movement = Vector2.ZERO
 var forward_isdown = false
@@ -101,9 +108,9 @@ var physics_gun_fire_isdown = false
 @onready var right_footstep = $"ModelRoot/HumanModel/root/Skeleton3D/RightFootLocation/FootstepPlayer"
 @onready var left_footstep = $"ModelRoot/HumanModel/root/Skeleton3D/LeftFootLocation/FootstepPlayer"
 @onready var jump_land_audio = $"ModelRoot/JumpLandPlayer"
-@onready var default_physics_gun_object = $"DefaultGunObject"
-@onready var default_physics_gun_mesh = $"DefaultGunObject/MeshInstance3D"
-@onready var default_physics_gun_collider = $"DefaultGunObject/CollisionShape3D"
+@onready var physics_object_collector = $"CameraPivot/SpringArm/PhysicsGun/PhysicsObjectCollector"
+@onready var physics_object_collector_collider = $"CameraPivot/SpringArm/PhysicsGun/PhysicsObjectCollector/CollisionShape3D"
+@onready var physics_gun_raycast = $"CameraPivot/SpringArm/PhysicsGun/RayCast3D"
 
 @onready var bump_audio = load("res://Godot-Human-For-Scale/Assets/BumpAudio.tscn")
 
@@ -124,6 +131,11 @@ func _ready():
 	var y_rotation = Vector3(0.0, global_rotation.y, 0.0)
 	
 	global_rotation = Vector3.ZERO
+	
+	physics_object_collector_collider.shape.height = PHYSICS_GUN_PULL_RANGE
+	physics_object_collector_collider.shape.radius = PHYSICS_GUN_PULL_WIDTH
+	physics_object_collector_collider.position.z = -(PHYSICS_GUN_PULL_RANGE/2)
+	physics_gun_raycast.target_position.z = -PHYSICS_GUN_PULL_RANGE
 	
 	camera_pivot.global_rotation = y_rotation
 	model_root.global_rotation = y_rotation
@@ -176,7 +188,7 @@ func _process(delta):
 		has_landed_from_fall = false
 	
 	input_velocity = velocity
-	orig_transform = transform
+	orig_transform = global_transform
 	
 	move_and_slide()
 	
@@ -188,54 +200,9 @@ func _process(delta):
 	if !has_stairstepped:
 		collate_rigidbody_interactions()
 
-func stairstepping(starting_transform, delta):
-	if (input_velocity.x == 0 and input_velocity.z == 0) or noclip_on or !is_on_floor() or !is_on_wall():
-		return false
-	
-	var collision_out = KinematicCollision3D.new()
-	var begin_transform = starting_transform
-	var test_direction = Vector3.UP * STEP_HEIGHT
-	# Test to above current position
-	var can_not_step = test_move(begin_transform, test_direction)
-	
-	if can_not_step:
-		return false
-	
-	begin_transform.origin = begin_transform.origin + test_direction
-	test_direction = Vector3(input_velocity.x, 0, input_velocity.z) * delta
-	# Then, test towards player's direction running into wall
-	can_not_step = test_move(begin_transform, test_direction)
-	
-	if can_not_step:
-		return false
-	
-	begin_transform.origin = begin_transform.origin + test_direction
-	test_direction = Vector3.DOWN * STEP_HEIGHT
-	# Then, test downwards
-	can_not_step = test_move(begin_transform, test_direction, collision_out)
-	
-	if can_not_step:
-		# If we hit something, teleport towards hit location
-		begin_transform.origin = begin_transform.origin + collision_out.get_travel()
-	else:
-		# If we hit nothing, teleport back to original height
-		begin_transform.origin = begin_transform.origin + test_direction
-	
-	# Without the buffer the player can fail to make steps, especially at higher framerates
-	var step_landing_buffer = floor_snap_length - safe_margin
-	begin_transform.origin = begin_transform.origin + (Vector3.UP * step_landing_buffer)
-	transform = begin_transform
-	return true
-
-func collate_rigidbody_interactions():
-	for index in get_slide_collision_count():
-		if get_slide_collision(index) == null:
-			continue
-		var collision = get_slide_collision(index)
-		if collision.get_collider() is RigidBody3D:
-			rigidbody_collisions.append(collision)
-
 func _physics_process(delta):
+	process_physics_gun(delta)
+	
 	var collide_force = COLLIDE_FORCE * delta
 	var central_multiplier = input_velocity.length() * collide_force
 	
@@ -281,6 +248,53 @@ func _physics_process(delta):
 			non_expired_cooldowns.append(cooldown)
 	
 	collider_bump_cooldowns = non_expired_cooldowns
+
+func stairstepping(starting_transform, delta):
+	if (input_velocity.x == 0 and input_velocity.z == 0) or noclip_on or !is_on_floor() or !is_on_wall():
+		return false
+	
+	var collision_out = KinematicCollision3D.new()
+	var begin_transform = starting_transform
+	var test_direction = Vector3.UP * STEP_HEIGHT
+	# Test to above current position
+	var can_not_step = test_move(begin_transform, test_direction)
+	
+	if can_not_step:
+		return false
+	
+	begin_transform.origin = begin_transform.origin + test_direction
+	test_direction = Vector3(input_velocity.x, 0, input_velocity.z) * delta
+	# Then, test towards player's direction running into wall
+	can_not_step = test_move(begin_transform, test_direction)
+	
+	if can_not_step:
+		return false
+	
+	begin_transform.origin = begin_transform.origin + test_direction
+	test_direction = Vector3.DOWN * STEP_HEIGHT
+	# Then, test downwards
+	can_not_step = test_move(begin_transform, test_direction, collision_out)
+	
+	if can_not_step:
+		# If we hit something, teleport towards hit location
+		begin_transform.origin = begin_transform.origin + collision_out.get_travel()
+	else:
+		# If we hit nothing, teleport back to original height
+		begin_transform.origin = begin_transform.origin + test_direction
+	
+	# Without the buffer the player can fail to make steps, especially at higher framerates
+	var step_landing_buffer = floor_snap_length - safe_margin
+	begin_transform.origin = begin_transform.origin + (Vector3.UP * step_landing_buffer)
+	global_transform = begin_transform
+	return true
+
+func collate_rigidbody_interactions():
+	for index in get_slide_collision_count():
+		if get_slide_collision(index) == null:
+			continue
+		var collision = get_slide_collision(index)
+		if collision.get_collider() is RigidBody3D:
+			rigidbody_collisions.append(collision)
 
 func _on_right_footstep():
 	if !enable_audio:
@@ -400,6 +414,9 @@ func process_cam_toggle(delta):
 	cam_toggle_cooldown = clamp(cam_toggle_cooldown, 0.0, TOGGLE_COOLDOWN)
 
 func process_cam_zoom(delta):
+	if !mousecapture_on:
+		return
+	
 	if zoom_isdown and cam_zoom_cooldown == 0.0 and !is_cam_transitioning:
 		cam_is_zoomed = !cam_is_zoomed
 		cam_zoom_cooldown = TOGGLE_COOLDOWN
@@ -418,35 +435,81 @@ func process_shoulder_swap(delta):
 	shoulder_cooldown = clamp(shoulder_cooldown, 0.0, TOGGLE_COOLDOWN)
 
 func process_physics_gun_fire(delta):
+	if !enable_physics_gun or !mousecapture_on:
+		return
+	
 	if physics_gun_fire_isdown and physics_gun_cooldown == 0.0:
-		if physics_gun_object == null:
-			init_physics_gun_default()
-		fire_physics_gun()
+		if physics_gun_has_grabbed:
+			fire_physics_gun()
+		else:
+			grab_physics_gun()
 		physics_gun_cooldown = TOGGLE_COOLDOWN
 	
 	physics_gun_cooldown -= delta
 	physics_gun_cooldown = clamp(physics_gun_cooldown, 0.0, TOGGLE_COOLDOWN)
 
-func init_physics_gun_default():
-	if !enable_physics_gun:
+func grab_physics_gun():
+	var rigidbodies_detected = []
+	
+	for node in physics_object_collector.get_overlapping_bodies():
+		if node is RigidBody3D:
+			rigidbodies_detected.append(node)
+	
+	if physics_gun_raycast.is_colliding():
+		physics_gun_hit_point = physics_gun_raycast.get_collision_point()
+	else:
+		physics_gun_hit_point = spring_arm.global_position
+	
+	rigidbodies_detected.sort_custom(rigidbody_distance_sort)
+	
+	if rigidbodies_detected.size() == 0 or rigidbodies_detected[0] == null:
 		return
-	physics_gun_object = default_physics_gun_object
-	remove_child(default_physics_gun_object)
-	get_tree().root.get_child(0).add_child(default_physics_gun_object)
-	default_physics_gun_object.freeze = false
-	default_physics_gun_mesh.visible = true
-	default_physics_gun_collider.disabled = false
+	
+	physics_gun_object = rigidbodies_detected[0]
+	
+	physics_gun_object_linear_damp = physics_gun_object.linear_damp
+	physics_gun_object_angular_damp = physics_gun_object.angular_damp
+	physics_gun_object.linear_damp = PHYSICS_GUN_DAMPING
+	physics_gun_object.angular_damp = PHYSICS_GUN_DAMPING
+	
+	physics_gun_has_grabbed = true
+
+func rigidbody_distance_sort(rigidbody_a, rigidbody_b):
+	if physics_gun_hit_point.distance_to(rigidbody_a.global_position) < physics_gun_hit_point.distance_to(rigidbody_b.global_position):
+		return true
+	else:
+		return false
 
 func fire_physics_gun():
-	if !enable_physics_gun:
-		return
-	if physics_gun_object == null:
-		return
+	physics_gun_has_grabbed = false
+	
+	physics_gun_object.linear_damp = physics_gun_object_linear_damp
+	physics_gun_object.angular_damp = physics_gun_object_angular_damp
 	
 	physics_gun_object.linear_velocity = Vector3.ZERO
 	physics_gun_object.angular_velocity = Vector3.ZERO
-	physics_gun_object.global_position = camera_pivot.global_position + (-camera_pivot.basis.z * physics_gun_initial_distance)
-	physics_gun_object.apply_central_impulse(-camera_pivot.basis.z * (physics_gun_force * physics_gun_object.mass))
+	physics_gun_object.constant_force = Vector3.ZERO
+	
+	physics_gun_object.apply_central_impulse(-camera_pivot.basis.z * (PHYSICS_GUN_SHOOT_FORCE * physics_gun_object.mass))
+
+func process_physics_gun(delta):
+	if !enable_physics_gun or !physics_gun_has_grabbed:
+		return
+	
+	if physics_gun_object == null:
+		physics_gun_has_grabbed = false
+		return
+	
+	var physics_gun_hold_location = camera_pivot.global_position + (-camera_pivot.global_basis.z * PHYSICS_GUN_HOLD_DISTANCE)
+	
+	var lerp_force = physics_gun_hold_location.distance_to(physics_gun_object.global_position) / PHYSICS_GUN_PULL_MARGIN
+	lerp_force = clamp(lerp_force, 0.0, 1.0)
+	
+	var physics_gun_suck = physics_gun_object.global_position.direction_to(physics_gun_hold_location) * PHYSICS_GUN_PULL_FORCE
+	physics_gun_suck = physics_gun_suck * physics_gun_object.mass
+	physics_gun_suck = lerp(Vector3.ZERO, physics_gun_suck, lerp_force)
+	
+	physics_gun_object.constant_force = physics_gun_suck
 
 func cam_transition():
 	if is_cam_transitioning:

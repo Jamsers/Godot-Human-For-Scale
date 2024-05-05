@@ -94,6 +94,21 @@ bone_idx = 4
 [node name="FootstepPlayer" type="AudioStreamPlayer3D" parent="root/Skeleton3D/LeftFootLocation" index="0"]
 stream = ExtResource("2_be2ba")
 
+[node name="FlashlightPin" type="BoneAttachment3D" parent="root/Skeleton3D" index="3"]
+transform = Transform3D(0.996065, 0.0203704, -0.0862458, -0.00854877, 0.990771, 0.135279, 0.0882055, -0.13401, 0.987047, 0.00198892, 1.25404, 0.0330552)
+bone_name = "spine_02"
+bone_idx = 12
+
+[node name="FlashlightOffset" type="Node3D" parent="root/Skeleton3D/FlashlightPin" index="0"]
+transform = Transform3D(-1, 0, 8.74228e-08, 0, 1, 0, -8.74228e-08, 0, -1, 0, 0.123, 0)
+
+[node name="SpotLight3D" type="SpotLight3D" parent="root/Skeleton3D/FlashlightPin/FlashlightOffset" index="0"]
+visible = false
+shadow_enabled = true
+shadow_blur = 2.0
+spot_range = 100.0
+spot_angle = 35.0
+
 [node name="AnimationPlayer" parent="." index="1"]
 libraries = {
 "": SubResource("AnimationLibrary_brjo7")

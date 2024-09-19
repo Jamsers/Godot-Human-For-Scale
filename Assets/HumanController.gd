@@ -9,6 +9,8 @@ extends CharacterBody3D
 
 # --- Stuff you might be interested in tweaking ---
 const LOOK_SENSITIVITY = 0.0025
+const ZOOM_SENSITIVITY_MULTIPLIER = 0.5
+const JOYSTICK_LOOK_MULTIPLIER = 1200.0
 const MOVE_MULT = 1.4
 const RUN_MULT = 1.25
 const FP_FOV = 75.0
@@ -67,6 +69,8 @@ var noclip_on = false
 var noclip_toggle_cooldown = 0.0
 var flashlight_on = false
 var flashlight_toggle_cooldown = 0.0
+var sprint_on = false
+var sprint_toggle_cooldown = 0.0
 var cam_is_fp = false
 var cam_toggle_cooldown = 0.0
 var cam_is_zoomed = false
@@ -90,7 +94,10 @@ var physics_gun_object_linear_damp = 0.0
 var physics_gun_object_angular_damp = 0.0
 var physics_gun_hit_point = Vector3.ZERO
 
-var mouse_movement = Vector2.ZERO
+var look_movement = Vector2.ZERO
+var mouse_look = Vector2.ZERO
+var joystick_look = Vector2.ZERO
+var joystick_move = Vector2.ZERO
 var forward_isdown = false
 var backward_isdown = false
 var left_isdown = false
@@ -168,13 +175,14 @@ func _ready():
 	boot_sound_timeout = false
 
 func _process(delta):
-	process_camera()
+	process_camera(delta)
 	process_off_on_floor_time(delta)
 	process_movement()
 	process_animation(delta)
 	process_mousecapture(delta)
 	process_noclip(delta)
 	process_flashlight(delta)
+	process_sprint(delta)
 	process_cam_toggle(delta)
 	process_cam_zoom(delta)
 	process_shoulder_swap(delta)
@@ -182,7 +190,7 @@ func _process(delta):
 	process_dof(delta)
 	
 	var move_speed = ANIM_MOVE_SPEED * MOVE_MULT
-	if sprint_isdown:
+	if sprint_on:
 		move_speed = ANIM_RUN_SPEED * RUN_MULT
 	
 	if noclip_on:
@@ -361,18 +369,25 @@ func process_off_on_floor_time(delta):
 	is_on_floor_duration = clamp(is_on_floor_duration, 0.0, JUMP_LAND_TIMEOUT)
 	is_off_floor_duration = clamp(is_off_floor_duration, 0.0, JUMP_LAND_TIMEOUT)
 
-func process_camera():
+func process_camera(delta):
+	look_movement -= (map_square_to_circle(joystick_look) * delta) * JOYSTICK_LOOK_MULTIPLIER
+	look_movement -= mouse_look
+	
+	if cam_is_zoomed:
+		look_movement = look_movement * ZOOM_SENSITIVITY_MULTIPLIER
+	
 	var camera_rotation_euler = camera_rotation.get_euler()
 	
 	if mousecapture_on:
-		camera_rotation_euler += Vector3(mouse_movement.y, mouse_movement.x, 0.0) * LOOK_SENSITIVITY
+		camera_rotation_euler += Vector3(look_movement.y, look_movement.x, 0.0) * LOOK_SENSITIVITY
 		camera_rotation_euler.x = clamp(camera_rotation_euler.x, LOOK_LIMIT_LOWER, LOOK_LIMIT_UPPER)
 	
 	camera_rotation = Quaternion.from_euler(camera_rotation_euler)
 	camera_pivot.global_basis = Basis(camera_rotation)
 	camera_rotation_no_y = Basis(camera_pivot.global_basis.x, Vector3.UP, camera_pivot.global_basis.z).get_rotation_quaternion()
 	
-	mouse_movement = Vector2.ZERO
+	mouse_look = Vector2.ZERO
+	look_movement = Vector2.ZERO
 
 func process_movement():
 	var input_direction = Vector3.ZERO
@@ -386,6 +401,9 @@ func process_movement():
 	if right_isdown:
 		input_direction.x += 1.0
 	
+	input_direction.z += map_square_to_circle(joystick_move).y
+	input_direction.x += map_square_to_circle(joystick_move).x
+	
 	move_direction = camera_rotation * input_direction
 	move_direction_no_y = camera_rotation_no_y * input_direction
 	move_direction = move_direction.normalized()
@@ -395,7 +413,7 @@ func process_animation(delta):
 	if is_off_floor_duration >= JUMP_LAND_TIMEOUT:
 		switch_anim("Fall")
 	elif move_direction != Vector3.ZERO:
-		if sprint_isdown:
+		if sprint_on:
 			switch_anim("Run", RUN_MULT)
 		else:
 			switch_anim("Jog", MOVE_MULT)
@@ -435,6 +453,19 @@ func process_flashlight(delta):
 	
 	flashlight_toggle_cooldown -= delta
 	flashlight_toggle_cooldown = clamp(flashlight_toggle_cooldown, 0.0, TOGGLE_COOLDOWN)
+
+func process_sprint(delta):
+	if move_direction == Vector3.ZERO:
+		sprint_on = false
+		
+	if sprint_isdown and sprint_toggle_cooldown == 0.0:
+		if move_direction != Vector3.ZERO:
+			sprint_on = !sprint_on
+		
+		sprint_toggle_cooldown = TOGGLE_COOLDOWN
+	
+	sprint_toggle_cooldown -= delta
+	sprint_toggle_cooldown = clamp(sprint_toggle_cooldown, 0.0, TOGGLE_COOLDOWN)
 
 func process_cam_toggle(delta):
 	if cam_toggle_isdown and cam_toggle_cooldown == 0.0 and !is_cam_transitioning:
@@ -686,7 +717,7 @@ func assert_practical_attributes(attributes):
 
 func _unhandled_input(event):
 	if event is InputEventMouseMotion:
-		mouse_movement -= event.relative
+		mouse_look = event.relative
 	
 	if event is InputEventMouseButton:
 		match event.button_index:
@@ -719,10 +750,56 @@ func _unhandled_input(event):
 				mousecapture_isdown = event.pressed
 			KEY_TAB:
 				shoulder_isdown = event.pressed
+	
+	if event is InputEventJoypadMotion:
+		match event.axis:
+			JOY_AXIS_LEFT_X:
+				joystick_move.x = event.axis_value
+			JOY_AXIS_LEFT_Y:
+				joystick_move.y = event.axis_value
+			JOY_AXIS_RIGHT_X:
+				joystick_look.x = event.axis_value
+			JOY_AXIS_RIGHT_Y:
+				joystick_look.y = event.axis_value
+			JOY_AXIS_TRIGGER_LEFT:
+				zoom_isdown = false
+				if event.axis_value > 0.15:
+					zoom_isdown = true
+				else:
+					zoom_isdown = false
+			JOY_AXIS_TRIGGER_RIGHT:
+				if event.axis_value > 0.15:
+					physics_gun_fire_isdown = true
+				else:
+					physics_gun_fire_isdown = false
+	
+	if event is InputEventJoypadButton:
+		match event.button_index:
+			JOY_BUTTON_BACK:
+				cam_toggle_isdown = event.pressed
+			JOY_BUTTON_DPAD_DOWN:
+				flashlight_isdown = event.pressed
+			JOY_BUTTON_DPAD_UP:
+				noclip_isdown = event.pressed
+			JOY_BUTTON_LEFT_STICK:
+				sprint_isdown = event.pressed
+			JOY_BUTTON_A:
+				jump_isdown = event.pressed
+			JOY_BUTTON_START:
+				mousecapture_isdown = event.pressed
+			JOY_BUTTON_LEFT_SHOULDER:
+				shoulder_isdown = event.pressed
 
 func switch_anim(anim, speed = 1.0):
 	if anim_player.current_animation != anim:
 		anim_player.play(anim, -1, speed)
+
+# oh god oh math oh fuck: https://raw.org/article/how-to-map-a-square-to-a-circle/
+func map_square_to_circle(square: Vector2) -> Vector2:
+	var circle = square
+	circle.x = circle.x * sqrt(1.0 - (square.y * square.y / 2.0));
+	circle.y = circle.y * sqrt(1.0 - (square.x * square.x / 2.0));
+	return circle
 
 func quat_rotate_toward(from: Quaternion, to: Quaternion, delta: float) -> Quaternion:
 	return from.slerp(to, clamp(delta / from.angle_to(to), 0.0, 1.0)).normalized()

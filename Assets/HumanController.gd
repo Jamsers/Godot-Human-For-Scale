@@ -764,7 +764,6 @@ func _unhandled_input(event):
 			JOY_AXIS_RIGHT_Y:
 				joystick_look.y = event.axis_value
 			JOY_AXIS_TRIGGER_LEFT:
-				zoom_isdown = false
 				if event.axis_value > 0.15:
 					zoom_isdown = true
 				else:

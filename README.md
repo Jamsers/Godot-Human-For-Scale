@@ -2,7 +2,7 @@
 
 Simple controllable character that you can use to run around in your [Godot](https://godotengine.org/) level to get a sense of scale. No input bindings or camera set up necessary, just drag and drop into your scene. The character is 5'10. (177.8 cm)
 
-![Bistro-Demo-Tweaked](https://github.com/user-attachments/assets/8b624fae-4969-4d5e-949c-75d30eed53c6)
+https://github.com/Jamsers/Godot-Human-For-Scale/assets/39361911/ea40c6ec-47b0-43da-a2c2-1e5539d293f6
 
 [![Godot](https://img.shields.io/badge/Godot-478cbf?style=for-the-badge&logo=godot-engine&logoColor=white)](https://godotengine.org/)
 

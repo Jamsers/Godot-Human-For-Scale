@@ -1,0 +1,53 @@
+ATTRIBUTION
+
+This document details attribution for content within this project.
+
+-----------------------------------------------------------------------------------------------------------
+
+1. PROJECT CONTENT
+
+Project is "Godot-Human-For-Scale"
+  By John James Gutib (https://github.com/Jamsers)
+  Licensed under MIT (LICENSE-CODE)
+
+-----------------------------------------------------------------------------------------------------------
+
+2. 3D MODELS
+
+Assets/godot-3d-mannequin/ is adapted from:
+  "mannequiny" (https://github.com/gdquest-demos/godot-3d-mannequin/tree/master/godot/assets/3d/mannequiny)
+    By GDQuest and contributors (https://www.gdquest.com/)
+    Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+-----------------------------------------------------------------------------------------------------------
+
+3. AUDIO
+
+Assets/Audio/Footstep1.wav is adapted from:
+  "Hard Female Footstep (1)" (https://freesound.org/people/OwlStorm/sounds/151232/)
+    By Ashe Kirk (https://owlisharts.com.au/)
+    Licensed under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/)
+
+Assets/Audio/Footstep2.wav is adapted from:
+  "Hard Female Footstep (2)" (https://freesound.org/people/OwlStorm/sounds/151238/)
+    By Ashe Kirk (https://owlisharts.com.au/)
+    Licensed under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/)
+
+Assets/Audio/Footstep3.wav is adapted from:
+  "Hard Female Footstep (3)" (https://freesound.org/people/OwlStorm/sounds/151237/)
+    By Ashe Kirk (https://owlisharts.com.au/)
+    Licensed under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/)
+
+Assets/Audio/Footstep4.wav is adapted from:
+  "Hard Female Footstep (4)" (https://freesound.org/people/OwlStorm/sounds/151222/)
+    By Ashe Kirk (https://owlisharts.com.au/)
+    Licensed under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/)
+
+Assets/Audio/Bump1.wav,
+Assets/Audio/Bump2.wav,
+Assets/Audio/Bump3.wav, are adapted from:
+  "Bumping into table ." (https://freesound.org/people/Edelhanie/sounds/594660/)
+    By Edelhanie (https://freesound.org/people/Edelhanie/)
+    Licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+-----------------------------------------------------------------------------------------------------------

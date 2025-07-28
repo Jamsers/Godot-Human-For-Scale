@@ -131,19 +131,19 @@ var physics_gun_fire_isdown = false
 @onready var flashlight_pin = $"ModelRoot/HumanModel/root/Skeleton3D/FlashlightPin/FlashlightOffset"
 @onready var flashlight = $"ModelRoot/HumanModel/root/Skeleton3D/FlashlightPin/FlashlightOffset/SpotLight3D"
 
-@onready var bump_audio = load("res://Godot-Human-For-Scale/Assets/BumpAudio.tscn")
+@onready var bump_audio = load("uid://c5r7pinh8okrp")
 
 @onready var footstep_sounds = [
-	load("res://Godot-Human-For-Scale/Assets/Audio/Footstep1.wav"),
-	load("res://Godot-Human-For-Scale/Assets/Audio/Footstep2.wav"),
-	load("res://Godot-Human-For-Scale/Assets/Audio/Footstep3.wav"),
-	load("res://Godot-Human-For-Scale/Assets/Audio/Footstep4.wav")
+	load("uid://dsfef5dgmtub1"),
+	load("uid://cmwvrkhxcdfu0"),
+	load("uid://bs52hi1t1mgqk"),
+	load("uid://s524bsmk11py")
 	]
 
 @onready var bump_sounds = [
-	load("res://Godot-Human-For-Scale/Assets/Audio/Bump1.wav"),
-	load("res://Godot-Human-For-Scale/Assets/Audio/Bump2.wav"),
-	load("res://Godot-Human-For-Scale/Assets/Audio/Bump3.wav")
+	load("uid://wlfxh2fk3uo4"),
+	load("uid://d3akgfcnosypu"),
+	load("uid://b64ceruixmwxb")
 	]
 
 func _ready():
